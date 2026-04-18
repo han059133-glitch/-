@@ -29,18 +29,34 @@ margin-bottom:10px;
 }
 
 .rule{
-background:rgba(255,255,255,.95);
-font-size:12px;
+font-size:13px;
+line-height:1.6;
+background:#f7f8ff;
 padding:10px;
 border-radius:10px;
-line-height:1.6;
-white-space:pre-line;
 }
 
-.status{
-text-align:center;
-font-size:18px;
-margin:10px 0;
+.smallbtn{
+background:#444;
+font-size:12px;
+padding:8px;
+border:none;
+border-radius:8px;
+color:#fff;
+margin-top:8px;
+width:100%;
+}
+
+.detail{
+display:none;
+margin-top:10px;
+font-size:12px;
+line-height:1.6;
+white-space:pre-line;
+background:#ffffff;
+padding:10px;
+border-radius:10px;
+border:1px solid #eee;
 }
 
 button{
@@ -54,7 +70,11 @@ color:#fff;
 font-size:15px;
 }
 
-button:disabled{background:#aaa}
+.status{
+text-align:center;
+font-size:18px;
+margin:10px 0;
+}
 
 .roundResult{
 margin-top:12px;
@@ -81,7 +101,18 @@ line-height:1.6;
 
 <div class="title">🎓 逃课生存挑战</div>
 
+<!-- 🧾 规则区 -->
 <div class="rule">
+
+🎯 存活尽可能久  
+🧠 选择：逃课 / 代课 / 舍友代签  
+🪙 赌命最多3次  
+❤️ HP ≤ 0 游戏结束  
+
+<button class="smallbtn" onclick="toggleRule()">📖 查看详细规则</button>
+
+<div class="detail" id="detailRule">
+
 今天不想上课！
 
 🎯 测试你的逃课人格  
@@ -112,6 +143,9 @@ line-height:1.6;
 消耗2生命值进行硬币投掷：
 - 正面：+4生命值  
 - 反面：+0生命值
+
+</div>
+
 </div>
 
 <button onclick="startGame()" id="startBtn">▶️ 开始游戏</button>
@@ -140,6 +174,11 @@ line-height:1.6;
 let hp, round, gameOver;
 let stats, coinCount, coinWin, coinLose;
 let eventStats;
+
+function toggleRule(){
+let d=document.getElementById("detailRule");
+d.style.display = (d.style.display==="block")?"none":"block";
+}
 
 function startGame(){
 document.querySelector(".rule").style.display="none";
@@ -191,9 +230,7 @@ coinCount++;
 if(Math.random()<0.5){
 hp+=4;
 coinWin++;
-}else{
-coinLose++;
-}
+}else coinLose++;
 
 updateUI();
 checkGameOver();
@@ -250,42 +287,31 @@ function updateResult(t){
 document.getElementById("roundResult").innerText=t;
 }
 
-/* =====================
-   🏅 称号系统
-===================== */
-
 function getTitle(){
 
 let total = stats.skip + stats.proxy + stats.roommate || 1;
 let skipR = stats.skip / total;
 
-if(coinWin === 3) return "🍀 欧皇";
-if(coinWin === 0) return "☠️ 非酋";
-
-if(skipR >= 0.5) return "😈 逃课大师";
-if(stats.proxy >= 3) return "🤝 代课操盘者";
-
-if(eventStats.watch >= 2) return "👁️ 巡查重点对象";
-if(eventStats.trap >= 2) return "🌩️ 天选倒霉蛋";
-if(eventStats.bless >= 2) return "😇 系统偏爱者";
-
-if(stats.skip + coinWin >= 6) return "💀 高危逃课者";
+if(coinWin===3) return "🍀 欧皇";
+if(coinWin===0) return "☠️ 非酋";
+if(skipR>=0.5) return "😈 逃课大师";
+if(stats.proxy>=3) return "🤝 代课操盘者";
+if(eventStats.watch>=2) return "👁️ 巡查重点对象";
+if(eventStats.trap>=2) return "🌩️ 天选倒霉蛋";
+if(eventStats.bless>=2) return "😇 系统偏爱者";
+if(stats.skip+coinWin>=6) return "💀 高危逃课者";
 
 return "🧠 稳定生存者";
 }
-
-/* =====================
-   🧬 人格系统
-===================== */
 
 function getPersona(){
 
 let total = stats.skip + stats.proxy + stats.roommate || 1;
 let skipR = stats.skip / total;
 
-if(skipR >= 0.5) return "逃课型选手";
-if(stats.proxy >= 3) return "外包型选手";
-if(stats.skip + coinWin >= 6) return "豪赌型选手";
+if(skipR>=0.5) return "逃课型选手";
+if(stats.proxy>=3) return "外包型选手";
+if(stats.skip+coinWin>=6) return "豪赌型选手";
 
 return "稳定型选手";
 }
@@ -296,14 +322,11 @@ if(hp>0) return;
 
 gameOver=true;
 
-let title=getTitle();
-let persona=getPersona();
-
 document.getElementById("result").innerText =
 `🎉 游戏结束
 
-🏅 称号：${title}
-🧬 人格：${persona}
+🏅 称号：${getTitle()}
+🧬 人格：${getPersona()}
 
 📊 逃课 ${stats.skip} | 代课 ${stats.proxy} | 舍友 ${stats.roommate}
 🪙 赌命 ${coinCount}（成功 ${coinWin}）`;
