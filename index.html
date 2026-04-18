@@ -5,89 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>逃课生存挑战</title>
 
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
 <style>
-body {
-    margin: 0;
-    font-family: "PingFang SC", sans-serif;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-}
-
-.container {
-    max-width: 420px;
-    margin: auto;
-    padding: 10px;
-}
-
-.card {
-    background: white;
-    border-radius: 16px;
-    padding: 15px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-}
-
-.rule {
-    background: rgba(255,255,255,0.95);
-    font-size: 13px;
-    padding: 10px;
-    margin-bottom: 10px;
-    border-radius: 10px;
-    line-height: 1.6;
-}
-
-h1 { text-align: center; }
-
-.status {
-    text-align: center;
-    font-size: 18px;
-    margin: 10px 0;
-}
-
-button {
-    width: 100%;
-    margin: 6px 0;
-    padding: 12px;
-    border: none;
-    border-radius: 10px;
-    background: #667eea;
-    color: white;
-    font-size: 15px;
-}
-
-button:disabled {
-    background: #aaa;
-}
-
-.roundResult {
-    margin-top: 12px;
-    padding: 12px;
-    background: #f8f9ff;
-    border-radius: 12px;
-    font-size: 14px;
-    line-height: 1.6;
-    white-space: pre-line;
-}
-
-.result {
-    text-align: center;
-    font-size: 16px;
-    margin-top: 12px;
-    line-height: 1.6;
-}
+body{margin:0;font-family:PingFang SC;background:linear-gradient(135deg,#667eea,#764ba2)}
+.container{max-width:420px;margin:auto;padding:10px}
+.card{background:#fff;border-radius:16px;padding:15px;box-shadow:0 10px 25px rgba(0,0,0,.2)}
+.rule{background:rgba(255,255,255,.95);font-size:13px;padding:10px;border-radius:10px;line-height:1.6}
+h1{text-align:center}
+.status{text-align:center;font-size:18px;margin:10px 0}
+button{width:100%;margin:6px 0;padding:12px;border:none;border-radius:10px;background:#667eea;color:#fff;font-size:15px}
+button:disabled{background:#aaa}
+.roundResult{margin-top:12px;padding:12px;background:#f8f9ff;border-radius:12px;font-size:14px;white-space:pre-line}
+.result{text-align:center;font-size:15px;margin-top:12px;line-height:1.6}
 </style>
 </head>
 
 <body>
-
 <div class="container">
 <div class="card">
 
-<!-- 规则 -->
 <div class="rule">
-今天不想上课！<br>
-🎯 活到最后即胜利<br>
-🧠 逃课 / 代课 / 舍友代签<br>
-⚡ 随机事件影响结果<br>
-🪙 赌命最多3次（-2血 → +4血 or 0）
+🎓 逃课生存挑战<br>
+📌 逃课 / 代课 / 舍友代签<br>
+⚠️ 学期会逐渐崩坏<br>
+🧠 老师会“记仇”
 </div>
 
 <h1>🎓 逃课生存挑战</h1>
@@ -95,16 +39,15 @@ button:disabled {
 <button onclick="startGame()" id="startBtn">▶️ 开始游戏</button>
 
 <div id="gameArea" style="display:none;">
-
 <div class="status">
-❤️ <span id="hp">8</span> | 第 <span id="round">1</span> 轮
+❤️ <span id="hp">8</span> | 第 <span id="round">1</span> 轮<br>
+📚 学期 <span id="sem">1</span> | 崩坏 <span id="col">0</span>
 </div>
 
-<button onclick="play('skip')" id="b1">😎 逃课</button>
-<button onclick="play('proxy')" id="b2">💰 请代课</button>
-<button onclick="play('roommate')" id="b3">🤝 舍友帮忙</button>
-<button onclick="coinFlip()" id="b4">🪙 赌命（-2血）</button>
-
+<button onclick="play('skip')">😎 逃课</button>
+<button onclick="play('proxy')">💰 代课</button>
+<button onclick="play('roommate')">🤝 舍友</button>
+<button onclick="coinFlip()">🪙 赌命</button>
 </div>
 
 <div class="roundResult" id="roundResult">点击开始游戏</div>
@@ -115,233 +58,188 @@ button:disabled {
 
 <script>
 
+//////////////// Firebase //////////////////
+const firebaseConfig = {
+    apiKey:"YOUR_KEY",
+    authDomain:"YOUR_DOMAIN",
+    projectId:"YOUR_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+//////////////// 状态 //////////////////
 let hp, round, coinCount, gameOver;
 let stats, coinWin, coinLose, eventStats;
+let teacherAnger = 0;
+let semester = 1, semesterRound = 1, collapse = 0;
 
 function startGame(){
-    document.querySelector(".rule").style.display = "none";
-    document.getElementById("startBtn").style.display = "none";
-    document.getElementById("gameArea").style.display = "block";
+    document.querySelector(".rule").style.display="none";
+    document.getElementById("startBtn").style.display="none";
+    document.getElementById("gameArea").style.display="block";
     init();
 }
 
 function init(){
-    hp = 8;
-    round = 1;
-    coinCount = 0;
-    gameOver = false;
-
-    stats = { skip:0, proxy:0, roommate:0 };
-    coinWin = 0;
-    coinLose = 0;
-    eventStats = { 慈悲:0, 巡查:0, 代课翻车:0 };
-
+    hp=8;round=1;coinCount=0;gameOver=false;
+    stats={skip:0,proxy:0,roommate:0};
+    coinWin=0;coinLose=0;
+    eventStats={慈悲:0,巡查:0,代课翻车:0};
     updateUI();
 }
 
+//////////////// 系统 //////////////////
 function randomResult(){
-    return ["不点名","纸质签到","定位签到"][Math.floor(Math.random()*3)];
+    if(collapse>=8) return Math.random()<0.8?"定位签到":"纸质签到";
+    if(collapse>=4) return Math.random()<0.5?"定位签到":"纸质签到";
+    return ["不点名","纸质签到","定位签到"][Math.random()*3|0];
 }
 
 function randomEvent(){
-    if(Math.random() > 0.3) return null;
-    return ["慈悲","巡查","代课翻车"][Math.floor(Math.random()*3)];
+    if(collapse>=6 && Math.random()<0.5) return "巡查";
+    if(Math.random()>0.3) return null;
+    return ["慈悲","巡查","代课翻车"][Math.random()*3|0];
 }
 
-function getChoiceName(c){
-    return { skip:"逃课", proxy:"请代课", roommate:"舍友代签" }[c];
+function getChoice(c){
+    return {skip:"逃课",proxy:"代课",roommate:"舍友"}[c];
 }
 
+//////////////// 赌命 //////////////////
 function coinFlip(){
-    if(gameOver || hp < 2 || coinCount >= 3) return;
+    if(gameOver||hp<2||coinCount>=3) return;
 
-    hp -= 2;
-    coinCount++;
+    hp-=2;coinCount++;teacherAnger++;
 
-    let text;
+    if(Math.random()<0.5){hp+=4;coinWin++;}
+    else coinLose++;
 
-    if(Math.random() < 0.5){
-        hp += 4;
-        coinWin++;
-        text = "🪙 正面 +4血";
-    }else{
-        coinLose++;
-        text = "💀 反面 +0";
-    }
-
+    collapse++;
     updateUI();
-    updateResult(text);
     checkGameOver();
 }
 
-function play(choice){
+//////////////// 主逻辑 //////////////////
+function play(c){
+
     if(gameOver) return;
 
-    stats[choice]++;
+    stats[c]++;
 
-    let result = randomResult();
-    let event = randomEvent();
+    teacherAnger += (c==="skip"?2:1);
+    collapse += 1;
+    semesterRound++;
 
-    let damage = 0;
-    let reduce = 0;
-    let roommateRate = 0.5;
+    let r=randomResult();
+    let e=randomEvent();
 
-    if(event){
-        eventStats[event]++;
+    let dmg=0;
 
-        if(event === "慈悲") reduce = 1;
-        if(event === "巡查") roommateRate = 0.9;
+    if(r==="纸质签到"){
+        if(c==="skip") dmg=2;
+        if(c==="roommate"&&Math.random()<0.5) dmg=2;
     }
 
-    if(result === "纸质签到"){
-        if(choice === "skip") damage = 2;
-        if(choice === "roommate" && Math.random() < roommateRate) damage = 2;
+    if(r==="定位签到"){
+        if(c==="skip") dmg=2;
+        if(c==="proxy") dmg=3;
     }
 
-    if(result === "定位签到"){
-        if(choice === "skip") damage = 2;
-        if(choice === "proxy") damage = 3;
-        if(choice === "roommate" && Math.random() < roommateRate) damage = 3;
-    }
+    if(e==="代课翻车") dmg+=2;
 
-    if(event === "代课翻车" && choice === "proxy" && Math.random() < 0.5){
-        damage += 2;
-    }
+    if(e==="慈悲") dmg-=1;
+    if(dmg<0) dmg=0;
 
-    damage = Math.max(0, damage - reduce);
-
-    hp -= damage;
+    hp-=dmg;
     round++;
 
     updateUI();
 
     updateResult(
-`📌 点名：${result}
-⚡ 事件：${event || "无"}
-👉 选择：${getChoiceName(choice)}
-💔 扣血：${damage}
-❤️ 剩余：${hp}`
+`📌 ${r}
+⚡ ${e||"无"}：${getEventDesc(e)}
+👉 ${getChoice(c)}
+💔 -${dmg}
+❤️ ${hp}
+📚 学期${semester} 崩坏${collapse}`
     );
+
+    if(semesterRound>=8){
+        semester++;semesterRound=1;collapse+=2;
+    }
 
     checkGameOver();
 }
 
-function checkGameOver(){
-    if(hp <= 0){
-        endGame();
-    }
+function getEventDesc(e){
+    if(!e) return "系统正常";
+    if(e==="慈悲") return "扣血减少";
+    if(e==="巡查") return "点名增强";
+    if(e==="代课翻车") return "额外风险";
 }
 
+//////////////// UI //////////////////
 function updateUI(){
-    document.getElementById("hp").innerText = hp;
-    document.getElementById("round").innerText = round;
+    document.getElementById("hp").innerText=hp;
+    document.getElementById("round").innerText=round;
+    document.getElementById("sem").innerText=semester;
+    document.getElementById("col").innerText=collapse;
 }
 
-function updateResult(text){
-    document.getElementById("roundResult").innerText = text;
+function updateResult(t){
+    document.getElementById("roundResult").innerText=t;
 }
 
-function enableButtons(on){
-    ["b1","b2","b3","b4"].forEach(id=>{
-        let btn = document.getElementById(id);
-        if(btn) btn.disabled = !on;
+//////////////// 分数 //////////////////
+function getScore(){
+    return round*10+stats.skip*2+stats.proxy*5+stats.roommate*5+coinWin*8;
+}
+
+//////////////// 上传 //////////////////
+async function upload(s){
+    await db.collection("players").add({
+        score:s,skip:stats.skip,proxy:stats.proxy,roommate:stats.roommate,time:Date.now()
     });
 }
 
-function endGame(){
-    gameOver = true;
-    enableButtons(false);
+async function rank(s){
+    let snap=await db.collection("players").get();
+    let t=snap.size,b=0;
+    snap.forEach(d=>{if(d.data().score<s)b++;});
+    return t?Math.floor(b/t*100):50;
+}
 
-    let total = stats.skip + stats.proxy + stats.roommate || 1;
-    let skipRate = stats.skip / total;
-    let proxyRate = stats.proxy / total;
-    let roommateRate = stats.roommate / total;
+//////////////// 结局 //////////////////
+async function checkGameOver(){
+    if(hp>0) return;
+    gameOver=true;
 
-    let title = "";
-    let reason = "";
-    let hidden = false;
+    let t=stats.skip+stats.proxy+stats.roommate||1;
+    let skipR=stats.skip/t;
 
-    // 🔒 隐藏结局
-    if(stats.skip <=1 && stats.proxy <=1 && stats.roommate <=1){
-        title = "🕶️ 虚无主义观察者";
-        reason = "你几乎不参与任何决策，像在旁观规则系统。";
-        hidden = true;
-    }
-    else if(coinCount >= 3 && coinWin >= 2){
-        title = "⚡ 命运操控者";
-        reason = "你在高风险博弈中持续获得收益。";
-        hidden = true;
-    }
-    else if(roommateRate >= 0.7){
-        title = "💀 学术幽灵";
-        reason = "你高度依赖他人完成学业行为。";
-        hidden = true;
-    }
+    let title="",reason="";
 
-    // 🎯 普通结局
-    if(!hidden){
-        if(coinWin >= 2){
-            title = "🎲 赌命之王";
-            reason = "你多次通过高风险决策获得收益。";
-        }
-        else if(eventStats["代课翻车"] >= 2){
-            title = "🤡 社死选手";
-            reason = "你多次因代课失败暴露风险。";
-        }
-        else if(coinCount >= 2){
-            title = "🪙 赌徒";
-            reason = "你频繁进行概率博弈但不稳定。";
-        }
-        else if(skipRate >= 0.5){
-            title = "😈 逃课大师";
-            reason = "你主要通过逃课规避风险。";
-        }
-        else if(proxyRate + roommateRate > skipRate){
-            title = "🤝 关系户";
-            reason = "你更依赖他人完成任务。";
-        }
-        else {
-            title = "🧠 生存者";
-            reason = "你在多种策略间保持均衡。";
-        }
-    }
+    if(collapse>=10) title="💀 学期崩坏者",reason="系统彻底失控";
+    else if(coinWin>=2) title="🎲 赌命之王",reason="高风险获益";
+    else if(skipR>=0.5) title="😈 逃课大师",reason="高频逃课";
+    else title="🧠 生存者",reason="均衡策略";
 
-    // 🧬 人格分析
-    let personality = "";
+    let score=getScore();
+    await upload(score);
+    let r=await rank(score);
 
-    if(skipRate >= 0.6){
-        personality = "🧠 风险逃避型：倾向规避课堂压力";
-    }
-    else if(proxyRate >= 0.4){
-        personality = "🧠 外包依赖型：倾向使用代劳策略";
-    }
-    else if(roommateRate >= 0.4){
-        personality = "🧠 社交依赖型：依赖他人行动";
-    }
-    else if(coinCount >= 2){
-        personality = "🧠 赌性偏好型：偏好概率决策";
-    }
-    else{
-        personality = "🧠 平衡控制型：策略分布均衡";
-    }
+    document.getElementById("result").innerText=
+`🎉 结束
+🏅 ${title}
+💬 ${reason}
 
-    document.getElementById("result").innerText =
-`🎉 游戏结束
-🧾 存活 ${round-1} 轮
+📊 逃课${stats.skip} 代课${stats.proxy} 舍友${stats.roommate}
+🪙 赌命${coinCount}
 
-🏅 结局：${title}
-💡 解析：${reason}
-
-📊 行为统计：
-- 逃课：${stats.skip}
-- 代课：${stats.proxy}
-- 舍友：${stats.roommate}
-- 赌命：${coinCount}（赢${coinWin}/输${coinLose}）
-
-${personality}`;
+🌍 超过${r}%玩家`;
 }
 
 </script>
-
 </body>
 </html>
