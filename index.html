@@ -28,42 +28,13 @@ font-weight:700;
 margin-bottom:10px;
 }
 
+/* 规则 */
 .rule{
 font-size:13px;
 line-height:1.6;
 background:#f7f8ff;
 padding:10px;
 border-radius:10px;
-}
-
-.simpleRule{
-white-space:pre-line;
-font-size:13px;
-line-height:1.6;
-margin-bottom:8px;
-}
-
-.smallbtn{
-background:#444;
-font-size:12px;
-padding:8px;
-border:none;
-border-radius:8px;
-color:#fff;
-margin-top:8px;
-width:100%;
-}
-
-.detail{
-display:none;
-margin-top:10px;
-font-size:12px;
-line-height:1.6;
-white-space:pre-line;
-background:#ffffff;
-padding:10px;
-border-radius:10px;
-border:1px solid #eee;
 }
 
 button{
@@ -79,8 +50,8 @@ font-size:15px;
 
 button:disabled{
 background:#999;
-cursor:not-allowed;
 opacity:0.6;
+cursor:not-allowed;
 }
 
 .status{
@@ -114,19 +85,41 @@ line-height:1.6;
 
 <div class="title">🎓 逃课生存挑战</div>
 
-<!-- 🧾 简单规则（已分行） -->
+<!-- 🧾 规则区 -->
 <div class="rule">
 
-<div class="simpleRule">
-🎯 存活尽可能久  
-🧠 选择：逃课 / 代课 / 舍友代签  
-🪙 赌命最多3次  
-❤️ 生命值 ≤ 0 游戏结束  
+<!-- 简单规则 -->
+<div>
+🎯 存活尽可能久<br>
+🧠 选择：逃课 / 代课 / 舍友代签<br>
+🪙 赌命最多3次<br>
+❤️ HP ≤ 0 游戏结束
 </div>
 
-<button class="smallbtn" onclick="toggleRule()">📖 查看详细规则</button>
+<button onclick="toggleRule()" style="
+margin-top:10px;
+width:100%;
+padding:8px;
+border:none;
+border-radius:8px;
+background:#444;
+color:#fff;
+font-size:12px;">
+📖 点击展开详细规则
+</button>
 
-<div class="detail" id="detailRule">
+<!-- 详细规则 -->
+<div id="detailRule" style="
+display:none;
+margin-top:10px;
+font-size:12px;
+line-height:1.6;
+white-space:pre-line;
+background:#fff;
+padding:10px;
+border-radius:10px;
+border:1px solid #eee;
+">
 
 今天不想上课！
 
@@ -134,16 +127,30 @@ line-height:1.6;
 🎯 游戏目标：尽可能存活更久（生命值 ≤ 0 时游戏结束）
 
 🧠 每回合选择：
-逃课 / 舍友代签 / 代课
+逃课 / 舍友代签 / 请代课
 
 📌 点名规则：
-① 不点名：安全  
-② 纸质签到：有风险  
-③ 定位签到：高风险  
 
-🪙 赌命机制：
-消耗2生命值 → 硬币：
-正面 +4生命值 / 反面 +0生命值
+① 不点名：
+- 无影响（最安全）
+
+② 纸质签到：
+- 逃课：-2生命值  
+- 舍友代签：有概率被发现（-2生命值）  
+- 请代课：安全  
+
+③ 定位签到：
+- 逃课：-2生命值  
+- 舍友代签：有概率被发现（-3生命值）  
+- 请代课：必定 -3生命值  
+
+⚡ 随机事件：
+每回合可能触发特殊事件
+
+🪙 赌命机制（最多3次）：
+消耗2生命值进行硬币投掷：
+- 正面：+4生命值  
+- 反面：+0生命值
 
 </div>
 
@@ -154,7 +161,7 @@ line-height:1.6;
 <div id="gameArea" style="display:none;">
 
 <div class="status">
-❤️ <span id="生命值">8</span> | 第 <span id="round">1</span> 轮
+❤️ <span id="hp">8</span> | 第 <span id="round">1</span> 轮
 </div>
 
 <button onclick="play('skip')">😎 逃课</button>
@@ -175,12 +182,13 @@ line-height:1.6;
 
 <script>
 
-let 生命值, round, gameOver;
+let hp, round, gameOver;
 let stats, coinCount, coinWin, coinLose;
+let eventStats;
 
 function toggleRule(){
 let d=document.getElementById("detailRule");
-d.style.display=(d.style.display==="block")?"none":"block";
+d.style.display = (d.style.display==="block") ? "none" : "block";
 }
 
 function startGame(){
@@ -191,7 +199,7 @@ init();
 }
 
 function init(){
-生命值=8;
+hp=8;
 round=1;
 gameOver=false;
 
@@ -200,22 +208,24 @@ coinCount=0;
 coinWin=0;
 coinLose=0;
 
+eventStats={trap:0,bless:0,watch:0};
+
 updateUI();
-}
-
-function updateUI(){
-document.getElementById("生命值").innerText=生命值;
-document.getElementById("round").innerText=round;
-
-document.getElementById("coinLeft").innerText = 3 - coinCount;
-
-if(coinCount>=3){
-document.getElementById("coinBtn").disabled = true;
-}
 }
 
 function randomResult(){
 return ["不点名","纸质签到","定位签到"][Math.random()*3|0];
+}
+
+function randomEvent(){
+if(Math.random()>0.8){
+let e=["代课翻车","慈悲","巡查"][Math.random()*3|0];
+if(e==="代课翻车") eventStats.trap++;
+if(e==="慈悲") eventStats.bless++;
+if(e==="巡查") eventStats.watch++;
+return e;
+}
+return null;
 }
 
 function getChoice(c){
@@ -227,17 +237,17 @@ function coinFlip(){
 
 if(gameOver||coinCount>=3) return;
 
-生命值 -= 2;
+hp -= 2;
 coinCount++;
 
-if(生命值 <= 0){
+if(hp <= 0){
 updateUI();
 checkGameOver();
 return;
 }
 
 if(Math.random()<0.5){
-生命值 += 4;
+hp += 4;
 coinWin++;
 }else{
 coinLose++;
@@ -254,6 +264,7 @@ if(gameOver) return;
 stats[c]++;
 
 let r=randomResult();
+let e=randomEvent();
 
 let dmg=0;
 
@@ -267,54 +278,102 @@ if(c==="skip") dmg=2;
 if(c==="proxy") dmg=3;
 }
 
-生命值 -= dmg;
+if(e==="代课翻车") dmg+=2;
+if(e==="慈悲") dmg-=1;
+
+if(dmg<0) dmg=0;
+
+hp -= dmg;
 round++;
 
 updateUI();
 
 updateResult(
 `📌 ${r}
+⚡ ${e||"无"}
 👉 ${getChoice(c)}
 💔 -${dmg}
-❤️ ${生命值}`
+❤️ ${hp}`
 );
 
 checkGameOver();
+}
+
+function updateUI(){
+document.getElementById("hp").innerText=hp;
+document.getElementById("round").innerText=round;
+
+document.getElementById("coinLeft").innerText = 3 - coinCount;
+
+if(coinCount>=3){
+document.getElementById("coinBtn").disabled = true;
+}
 }
 
 function updateResult(t){
 document.getElementById("roundResult").innerText=t;
 }
 
-function getTitle(){
-if(coinWin===3) return "🍀 欧皇";
-if(coinWin===0) return "☠️ 非酋";
-return "🧠 生存者";
+/* 🏅 称号（多条） */
+function getTitles(){
+
+let list=[];
+
+let total = stats.skip + stats.proxy + stats.roommate || 1;
+let skipR = stats.skip / total;
+
+if(coinWin === 3) list.push("🍀 欧皇（赌命3次全成功）");
+if(coinWin === 0) list.push("☠️ 非酋（赌命0次成功）");
+
+if(skipR >= 0.5) list.push("😈 逃课大师（逃课≥50%）");
+if(stats.proxy >= 3) list.push("🤝 代课操盘者（代课≥3）");
+
+if(eventStats.watch >= 2) list.push("👁️ 巡查重点对象（巡查≥2）");
+if(eventStats.trap >= 2) list.push("🌩️ 天选倒霉蛋（翻车≥2）");
+if(eventStats.bless >= 2) list.push("😇 系统偏爱者（慈悲≥2）");
+
+if(stats.skip + coinWin >= 6) list.push("💀 高危逃课者（风险≥6）");
+
+if(list.length === 0) list.push("🧠 稳定生存者（无成就触发）");
+
+return list;
 }
 
+/* 🧬 人格（四选一） */
 function getPersona(){
-if(stats.skip>=5) return "逃课型选手";
+
+let total = stats.skip + stats.proxy + stats.roommate || 1;
+let skipR = stats.skip / total;
+
+if(skipR >= 0.5) return "逃课型选手";
+if(stats.proxy >= 3) return "外包型选手";
+if(stats.skip + coinWin >= 6) return "豪赌型选手";
+
 return "稳定型选手";
 }
 
+/* ☠️ 结束 */
 function checkGameOver(){
 
-if(生命值>0) return;
+if(hp>0) return;
 
 gameOver=true;
+
+let titles = getTitles();
+let persona = getPersona();
 
 document.getElementById("result").innerText =
 `🎉 游戏结束
 
-🏅 称号：${getTitle()}
-🧬 人格：${getPersona()}
+🏅 称号达成：
+${titles.join("\n")}
+
+🧬 人格类型：${persona}
 
 📊 逃课 ${stats.skip} | 代课 ${stats.proxy} | 舍友 ${stats.roommate}
 🪙 赌命 ${coinCount}（成功 ${coinWin}）`;
-
 }
 
 </script>
-
 </body>
 </html>
