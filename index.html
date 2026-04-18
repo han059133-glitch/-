@@ -12,6 +12,7 @@
 body{margin:0;font-family:PingFang SC;background:linear-gradient(135deg,#667eea,#764ba2)}
 .container{max-width:420px;margin:auto;padding:10px}
 .card{background:#fff;border-radius:16px;padding:15px;box-shadow:0 10px 25px rgba(0,0,0,.2)}
+.title{font-size:22px;text-align:center;font-weight:700;margin-bottom:10px}
 .rule{background:rgba(255,255,255,.95);font-size:13px;padding:10px;border-radius:10px;line-height:1.6}
 h1{text-align:center}
 .status{text-align:center;font-size:18px;margin:10px 0}
@@ -26,6 +27,10 @@ button:disabled{background:#aaa}
 <div class="container">
 <div class="card">
 
+<!-- ⭐ 标题移到最上面 -->
+<div class="title">🎓 逃课生存挑战</div>
+
+<!-- ⭐ 新开头文本 -->
 <div class="rule">
 今天不想上课！<br><br>
 
@@ -57,8 +62,6 @@ button:disabled{background:#aaa}
 - 反面：+0生命值
 </div>
 
-<h1>🎓 逃课生存挑战</h1>
-
 <button onclick="startGame()" id="startBtn">▶️ 开始游戏</button>
 
 <div id="gameArea" style="display:none;">
@@ -79,8 +82,181 @@ button:disabled{background:#aaa}
 </div>
 
 <script>
-// 下面JS保持你原来的，不变
-</script>
 
+const firebaseConfig = {
+    apiKey:"YOUR_KEY",
+    authDomain:"YOUR_DOMAIN",
+    projectId:"YOUR_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let hp, round, coinCount, gameOver;
+let stats, coinWin, coinLose;
+
+function startGame(){
+    document.querySelector(".rule").style.display="none";
+    document.getElementById("startBtn").style.display="none";
+    document.getElementById("gameArea").style.display="block";
+    init();
+}
+
+function init(){
+    hp=8;
+    round=1;
+    coinCount=0;
+    gameOver=false;
+
+    stats={skip:0,proxy:0,roommate:0};
+    coinWin=0;
+    coinLose=0;
+
+    updateUI();
+}
+
+function randomResult(){
+    return ["不点名","纸质签到","定位签到"][Math.random()*3|0];
+}
+
+function randomEvent(){
+    if(Math.random()>0.7) return ["慈悲","巡查","代课翻车"][Math.random()*3|0];
+    return null;
+}
+
+function getChoice(c){
+    return {skip:"逃课",proxy:"代课",roommate:"舍友代签"}[c];
+}
+
+function coinFlip(){
+    if(gameOver||hp<=0||coinCount>=3) return;
+
+    hp-=2;
+    coinCount++;
+
+    if(Math.random()<0.5){
+        hp+=4;
+        coinWin++;
+    } else {
+        coinLose++;
+    }
+
+    updateUI();
+    checkGameOver();
+}
+
+function play(c){
+
+    if(gameOver) return;
+
+    stats[c]++;
+
+    let r=randomResult();
+    let e=randomEvent();
+
+    let dmg=0;
+
+    if(r==="纸质签到"){
+        if(c==="skip") dmg=2;
+        if(c==="roommate"&&Math.random()<0.5) dmg=2;
+    }
+
+    if(r==="定位签到"){
+        if(c==="skip") dmg=2;
+        if(c==="proxy") dmg=3;
+    }
+
+    if(e==="代课翻车") dmg+=2;
+    if(e==="慈悲") dmg-=1;
+
+    if(dmg<0) dmg=0;
+
+    hp-=dmg;
+    round++;
+
+    updateUI();
+
+    updateResult(
+`📌 ${r}
+⚡ ${e||"无"}
+👉 ${getChoice(c)}
+💔 -${dmg}
+❤️ ${hp}`
+    );
+
+    checkGameOver();
+}
+
+function updateUI(){
+    document.getElementById("hp").innerText=hp;
+    document.getElementById("round").innerText=round;
+}
+
+function updateResult(t){
+    document.getElementById("roundResult").innerText=t;
+}
+
+function getScore(){
+    return round*10 + stats.skip*2 + stats.proxy*5 + stats.roommate*5 + coinWin*8;
+}
+
+async function upload(s){
+    await db.collection("players").add({
+        score:s,
+        skip:stats.skip,
+        proxy:stats.proxy,
+        roommate:stats.roommate,
+        time:Date.now()
+    });
+}
+
+async function getRankingStats(score){
+    let snap = await db.collection("players").get();
+
+    let total = snap.size;
+    let lower = 0;
+
+    snap.forEach(doc=>{
+        if(doc.data().score < score) lower++;
+    });
+
+    let percent = total ? Math.floor(lower / total * 100) : 0;
+
+    return { total, percent };
+}
+
+async function checkGameOver(){
+    if(hp>0) return;
+
+    gameOver=true;
+
+    let t=stats.skip+stats.proxy+stats.roommate||1;
+    let skipR=stats.skip/t;
+
+    let title="",reason="";
+
+    if(coinWin>=2) title="🎲 赌命之王",reason="高风险获益";
+    else if(skipR>=0.5) title="😈 逃课大师",reason="高频逃课";
+    else title="🧠 生存者",reason="均衡策略";
+
+    let score=getScore();
+
+    await upload(score);
+
+    let rank = await getRankingStats(score);
+
+    document.getElementById("result").innerText=
+`🎉 游戏结束
+🏅 ${title}
+💬 ${reason}
+
+📊 逃课${stats.skip} 代课${stats.proxy} 舍友${stats.roommate}
+🪙 赌命${coinCount}
+
+👥 当前玩家人数：${rank.total}
+📈 你击败了：${rank.percent}% 的玩家`;
+}
+
+</script>
 </body>
 </html>
