@@ -1,143 +1,107 @@
-<!DOCTYPE html>
-<html lang="zh">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>逃课生存挑战</title>
-<style>
-body {
-    font-family: sans-serif;
-    text-align: center;
-    background: #f5f5f5;
-}
-.container {
-    margin-top: 30px;
-}
-button {
-    margin: 10px;
-    padding: 12px 20px;
-    font-size: 16px;
-    border-radius: 8px;
-}
-.log {
-    margin-top: 20px;
-    height: 200px;
-    overflow-y: auto;
-    background: white;
-    padding: 10px;
-}
-</style>
-</head>
-<body>
-
-<div class="container">
-    <h2>逃课生存挑战</h2>
-    <p>生命值：<span id="hp">8</span></p>
-    <p>第 <span id="round">1</span> 轮</p>
-
-    <button onclick="play('skip')">逃课</button>
-    <button onclick="play('proxy')">请代课</button>
-    <button onclick="play('roommate')">拜托舍友</button>
-
-    <div class="log" id="log"></div>
-</div>
+<!-- 只展示核心新增逻辑，你直接替换原代码中的 endGame() 和新增变量 -->
 
 <script>
-let hp = 8;
-let round = 1;
 
-let stats = {
-    skip: 0,
-    proxy: 0,
-    roommate: 0,
-    luckySkip: 0,
-    safeProxy: 0,
-    safeRoommate: 0
+// 新增统计
+let coinWin = 0;
+let coinLose = 0;
+let noDamageStreak = 0;
+let damageStreak = 0;
+let maxNoDamageStreak = 0;
+let maxDamageStreak = 0;
+let eventStats = {
+    慈悲: 0,
+    巡查: 0,
+    代课翻车: 0
 };
 
-function randomResult() {
-    const arr = ["不点名", "纸质签到", "定位签到"];
-    return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function log(msg) {
-    const logDiv = document.getElementById("log");
-    logDiv.innerHTML += "<p>" + msg + "</p>";
-    logDiv.scrollTop = logDiv.scrollHeight;
-}
-
-function play(choice) {
+// 修改 coinFlip()
+function coinFlip() {
     if (hp <= 0) return;
 
-    stats[choice]++;
-
-    let result = randomResult();
-    let damage = 0;
-
-    if (result === "不点名") {
-        log(`本轮结果：不点名 ✅ 无事发生`);
-        if (choice === "skip") stats.luckySkip++;
-        if (choice === "proxy") stats.safeProxy++;
-        if (choice === "roommate") stats.safeRoommate++;
+    if (coinCount >= 3) {
+        log("⚠️ 赌太多了，收手吧！");
+        return;
     }
 
-    if (result === "纸质签到") {
-        if (choice === "skip") damage = 2;
-        if (choice === "roommate" && Math.random() < 0.5) damage = 2;
-        log(`本轮结果：纸质签到`);
+    if (hp < 2) {
+        log("❌ 血量不够，赌不了");
+        return;
     }
 
-    if (result === "定位签到") {
-        if (choice === "skip") damage = 2;
-        if (choice === "proxy") damage = 3;
-        if (choice === "roommate" && Math.random() < 0.5) damage = 3;
-        log(`本轮结果：定位签到`);
-    }
+    hp -= 2;
+    coinCount++;
 
-    hp -= damage;
-    if (hp < 0) hp = 0;
+    if (Math.random() < 0.5) {
+        hp += 4;
+        coinWin++;
+        log("🪙 正面！血赚 +4！");
+    } else {
+        coinLose++;
+        log("💀 反面…白亏2");
+    }
 
     document.getElementById("hp").innerText = hp;
-    document.getElementById("round").innerText = round;
-
-    log(`选择：${getChoiceName(choice)}，扣血：${damage}，剩余生命：${hp}`);
-
-    round++;
-
-    if (hp <= 0) endGame();
 }
 
-function getChoiceName(c) {
-    return {
-        skip: "逃课",
-        proxy: "请代课",
-        roommate: "拜托舍友"
-    }[c];
+// 在 play() 里记录事件次数
+if (event) {
+    eventStats[event]++;
 }
 
+// 在 play() 里最后加（更新连击）
+if (damage === 0) {
+    noDamageStreak++;
+    damageStreak = 0;
+} else {
+    damageStreak++;
+    noDamageStreak = 0;
+}
+
+maxNoDamageStreak = Math.max(maxNoDamageStreak, noDamageStreak);
+maxDamageStreak = Math.max(maxDamageStreak, damageStreak);
+
+
+// ⭐⭐⭐ 重写结算 ⭐⭐⭐
 function endGame() {
-    let title = "";
 
-    if (stats.skip === round - 1) {
-        title = "孤胆英雄";
-    } else if (stats.luckySkip >= 3) {
-        title = "幸运儿";
-    } else if (stats.safeProxy >= 3) {
-        title = "这钱花的值！";
-    } else if (stats.safeRoommate >= 3) {
-        title = "人脉王！";
-    } else {
-        title = "普通大学生";
-    }
+    let titles = [];
 
-    log("===== 游戏结束 =====");
-    log(`存活轮次：${round - 1}`);
-    log(`逃课次数：${stats.skip}`);
-    log(`代课次数：${stats.proxy}`);
-    log(`舍友次数：${stats.roommate}`);
-    log(`称号：${title}`);
+    // 🟢 操作流
+    if (stats.skip === round - 1) titles.push("😎 孤胆英雄");
+    if (stats.proxy >= 5) titles.push("💰 氪金战士");
+    if (stats.safeRoommate >= 3) titles.push("🤝 人脉王");
+    if (stats.skip >=3 && stats.proxy >=3 && stats.roommate >=3) titles.push("🧠 策略大师");
+
+    // 🟡 运气流
+    if (maxNoDamageStreak >= 3) titles.push("🍀 天选之子");
+    if (maxDamageStreak >= 3) titles.push("😭 非洲酋长");
+    if (coinWin >= 2) titles.push("🎲 赌狗之王");
+    if (coinLose >= 2) titles.push("💀 赌狗翻车王");
+
+    // 🔴 事件流
+    if (eventStats["慈悲"] >= 2) titles.push("🙏 天命加身");
+    if (eventStats["巡查"] >= 2) titles.push("👀 被重点关注");
+    if (eventStats["代课翻车"] >= 2) titles.push("🤡 社会性死亡");
+
+    // ⚫ 极端
+    if (round <= 3) titles.push("🧊 开局即凉");
+    if (round >= 10) titles.push("🏆 苟王之王");
+    if (maxDamageStreak === round - 1) titles.push("📉 稳定摆烂");
+
+    // 🎯 绝地翻盘
+    if (coinWin >=1 && hp > 0 && hp <= 2) titles.push("🎯 绝地翻盘");
+
+    // 默认
+    if (titles.length === 0) titles.push("🙂 普通大学生");
+
+    // 👉 最多显示2个（关键！）
+    let finalTitles = titles.slice(0, 2).join(" + ");
+
+    document.getElementById("result").innerHTML =
+        `🎉 游戏结束<br>
+        存活：${round - 1}轮<br>
+        🏅 称号：${finalTitles}`;
 }
-</script>
 
-</body>
-</html>
+</script>
