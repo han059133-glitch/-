@@ -35,6 +35,7 @@ body {
     padding: 10px;
     margin-bottom: 10px;
     border-radius: 10px;
+    line-height: 1.6;
 }
 
 h1 { text-align: center; }
@@ -79,13 +80,15 @@ button {
 <div class="card">
 
 <div class="rule">
-📜 <b>游戏规则</b><br>
-逃课 / 代课 / 舍友 → 随机点名<br>
-🟢 不点名：安全<br>
-📄 纸质签到：逃课扣2<br>
-📍 定位签到：风险更高<br>
-🪙 赌命：-2血，赢+4（最多3次）<br>
-⚡ 事件会改变规则
+今天不想上课！<br>
+🎯 游戏目标：尽可能活得更久！生命值降到 0，游戏结束<br>
+🧠 每一轮你要做选择：逃课 / 舍友代签 / 请代课<br>
+🎲 如果不点名，什么都不会发生（最安全）<br>
+如果纸质签到，则逃课扣除2生命值，舍友代签可能被发现（扣除2生命值），请代课安全<br>
+如果定位签到，则逃课扣除2生命值，舍友代签可能被发现（扣除3生命值），请代课必然扣除3生命值<br>
+⚡ 注意：可能会触发随机事件！<br>
+🪙 赌命机制：每局最多 3 次，可消耗 2生命值抛硬币<br>
+👉 正面 +4生命值 ｜ 👉 反面 +0生命值
 </div>
 
 <h1>🎓逃课生存挑战</h1>
@@ -118,9 +121,6 @@ let coinWin = 0, coinLose = 0;
 
 let eventStats = { 慈悲:0, 巡查:0, 代课翻车:0 };
 
-let noDamageStreak = 0, damageStreak = 0;
-let maxNoDamage = 0, maxDamage = 0;
-
 function randomResult(){
     return ["不点名","纸质签到","定位签到"][Math.floor(Math.random()*3)];
 }
@@ -134,11 +134,10 @@ function getChoiceName(c){
     return {
         skip:"逃课",
         proxy:"请代课",
-        roommate:"舍友帮忙"
+        roommate:"舍友代签"
     }[c];
 }
 
-// 🎲 赌命
 function coinFlip(){
     if(hp < 2 || coinCount >= 3){
         updateResult("⚠️ 无法赌命");
@@ -153,10 +152,10 @@ function coinFlip(){
     if(Math.random()<0.5){
         hp += 4;
         coinWin++;
-        text = "🪙 正面！血赚 +4";
+        text = "🪙 正面！+4生命";
     }else{
         coinLose++;
-        text = "💀 反面…亏了2血";
+        text = "💀 反面，什么都没发生";
     }
 
     document.getElementById("hp").innerText = hp;
@@ -168,7 +167,6 @@ ${text}<br>
 `);
 }
 
-// 🎮 主逻辑
 function play(choice){
     if(hp<=0) return;
 
@@ -214,18 +212,6 @@ function play(choice){
     hp -= damage;
     if(hp<0) hp=0;
 
-    // 连击统计
-    if(damage===0){
-        noDamageStreak++;
-        damageStreak=0;
-    }else{
-        damageStreak++;
-        noDamageStreak=0;
-    }
-
-    maxNoDamage = Math.max(maxNoDamage, noDamageStreak);
-    maxDamage = Math.max(maxDamage, damageStreak);
-
     document.getElementById("hp").innerText = hp;
     document.getElementById("round").innerText = round;
 
@@ -246,34 +232,16 @@ function updateResult(html){
     document.getElementById("roundResult").innerHTML = html;
 }
 
-// 🏁 结算
 function endGame(){
 
-    let titles = [];
+    let title = "🙂 普通大学生";
 
-    if(stats.skip === round-1) titles.push("😎 孤胆英雄");
-    if(stats.proxy >=5) titles.push("💰 氪金战士");
-    if(stats.roommate >=5) titles.push("🤝 人脉王");
-    if(stats.skip>=2 && stats.proxy>=2 && stats.roommate>=2) titles.push("🧠 策略大师");
-
-    if(maxNoDamage>=3) titles.push("🍀 天选之子");
-    if(maxDamage>=3) titles.push("😭 非洲酋长");
-    if(coinWin>=2) titles.push("🎲 赌狗之王");
-    if(coinLose>=2) titles.push("💀 赌狗翻车王");
-
-    if(eventStats["慈悲"]>=2) titles.push("🙏 天命加身");
-    if(eventStats["巡查"]>=2) titles.push("👀 被重点关注");
-    if(eventStats["代课翻车"]>=2) titles.push("🤡 社会性死亡");
-
-    if(round<=3) titles.push("🧊 开局即凉");
-    if(round>=10) titles.push("🏆 苟王之王");
-
-    if(titles.length===0) titles.push("🙂 普通大学生");
-
-    let show = titles.sort(()=>0.5-Math.random()).slice(0,2).join(" + ");
+    if(stats.skip === round-1) title = "😎 孤胆英雄";
+    if(coinWin >=2) title = "🎲 赌狗之王";
+    if(eventStats["代课翻车"]>=2) title = "🤡 社会性死亡";
 
     document.getElementById("result").innerHTML =
-        `🎉 游戏结束<br>存活 ${round-1} 轮<br>🏅 ${show}`;
+        `🎉 游戏结束<br>存活 ${round-1} 轮<br>🏅 ${title}`;
 }
 </script>
 
