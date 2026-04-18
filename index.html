@@ -26,11 +26,7 @@ body {
 }
 
 .rule {
-    position: sticky;
-    top: 0;
-    z-index: 100;
     background: rgba(255,255,255,0.95);
-    backdrop-filter: blur(6px);
     font-size: 13px;
     padding: 10px;
     margin-bottom: 10px;
@@ -57,19 +53,25 @@ button {
     font-size: 15px;
 }
 
+button:disabled {
+    background: #aaa;
+}
+
 .roundResult {
     margin-top: 12px;
     padding: 12px;
     background: #f8f9ff;
     border-radius: 12px;
-    font-size: 15px;
+    font-size: 14px;
     line-height: 1.6;
+    white-space: pre-line;
 }
 
 .result {
     text-align: center;
-    font-size: 18px;
+    font-size: 16px;
     margin-top: 12px;
+    line-height: 1.6;
 }
 </style>
 </head>
@@ -79,96 +81,101 @@ button {
 <div class="container">
 <div class="card">
 
+<!-- 规则 -->
 <div class="rule">
 今天不想上课！<br>
-🎯 游戏目标：尽可能活得更久！生命值降到 0，游戏结束<br>
-🧠 每一轮你要做选择：逃课 / 舍友代签 / 请代课<br>
-🎲 如果不点名，什么都不会发生（最安全）<br>
-如果纸质签到，则逃课扣除2生命值，舍友代签可能被发现（扣除2生命值），请代课安全<br>
-如果定位签到，则逃课扣除2生命值，舍友代签可能被发现（扣除3生命值），请代课必然扣除3生命值<br>
-⚡ 注意：可能会触发随机事件！<br>
-🪙 赌命机制：每局最多 3 次，可消耗 2生命值抛硬币<br>
-👉 正面 +4生命值 ｜ 👉 反面 +0生命值
+🎯 活到最后即胜利<br>
+🧠 逃课 / 代课 / 舍友代签<br>
+⚡ 随机事件影响结果<br>
+🪙 赌命最多3次（-2血 → +4血 or 0）
 </div>
 
-<h1>🎓逃课生存挑战</h1>
+<h1>🎓 逃课生存挑战</h1>
+
+<button onclick="startGame()" id="startBtn">▶️ 开始游戏</button>
+
+<div id="gameArea" style="display:none;">
 
 <div class="status">
 ❤️ <span id="hp">8</span> | 第 <span id="round">1</span> 轮
 </div>
 
-<button onclick="play('skip')">😎 逃课</button>
-<button onclick="play('proxy')">💰 请代课</button>
-<button onclick="play('roommate')">🤝 舍友帮忙</button>
-<button onclick="coinFlip()">🪙 赌命（-2血）</button>
+<button onclick="play('skip')" id="b1">😎 逃课</button>
+<button onclick="play('proxy')" id="b2">💰 请代课</button>
+<button onclick="play('roommate')" id="b3">🤝 舍友帮忙</button>
+<button onclick="coinFlip()" id="b4">🪙 赌命（-2血）</button>
 
-<div class="roundResult" id="roundResult">
-点击按钮开始游戏
 </div>
 
+<div class="roundResult" id="roundResult">点击开始游戏</div>
 <div class="result" id="result"></div>
 
 </div>
 </div>
 
 <script>
-let hp = 8;
-let round = 1;
-let coinCount = 0;
 
-let stats = { skip:0, proxy:0, roommate:0 };
-let coinWin = 0, coinLose = 0;
+let hp, round, coinCount, gameOver;
+let stats, coinWin, coinLose, eventStats;
 
-let eventStats = { 慈悲:0, 巡查:0, 代课翻车:0 };
+function startGame(){
+    document.querySelector(".rule").style.display = "none";
+    document.getElementById("startBtn").style.display = "none";
+    document.getElementById("gameArea").style.display = "block";
+    init();
+}
+
+function init(){
+    hp = 8;
+    round = 1;
+    coinCount = 0;
+    gameOver = false;
+
+    stats = { skip:0, proxy:0, roommate:0 };
+    coinWin = 0;
+    coinLose = 0;
+    eventStats = { 慈悲:0, 巡查:0, 代课翻车:0 };
+
+    updateUI();
+}
 
 function randomResult(){
     return ["不点名","纸质签到","定位签到"][Math.floor(Math.random()*3)];
 }
 
 function randomEvent(){
-    if(Math.random()>0.3) return null;
+    if(Math.random() > 0.3) return null;
     return ["慈悲","巡查","代课翻车"][Math.floor(Math.random()*3)];
 }
 
 function getChoiceName(c){
-    return {
-        skip:"逃课",
-        proxy:"请代课",
-        roommate:"舍友代签"
-    }[c];
+    return { skip:"逃课", proxy:"请代课", roommate:"舍友代签" }[c];
 }
 
 function coinFlip(){
-    if(hp < 2 || coinCount >= 3){
-        updateResult("⚠️ 无法赌命");
-        return;
-    }
+    if(gameOver || hp < 2 || coinCount >= 3) return;
 
     hp -= 2;
     coinCount++;
 
-    let text = "";
+    let text;
 
-    if(Math.random()<0.5){
+    if(Math.random() < 0.5){
         hp += 4;
         coinWin++;
-        text = "🪙 正面！+4生命";
+        text = "🪙 正面 +4血";
     }else{
         coinLose++;
-        text = "💀 反面，什么都没发生";
+        text = "💀 反面 +0";
     }
 
-    document.getElementById("hp").innerText = hp;
-
-    updateResult(`
-🎲 赌命结果<br>
-${text}<br>
-❤️ 当前生命：${hp}
-`);
+    updateUI();
+    updateResult(text);
+    checkGameOver();
 }
 
 function play(choice){
-    if(hp<=0) return;
+    if(gameOver) return;
 
     stats[choice]++;
 
@@ -176,73 +183,164 @@ function play(choice){
     let event = randomEvent();
 
     let damage = 0;
-    let roommateRate = 0.5;
     let reduce = 0;
-    let proxyFail = false;
-
-    let eventText = "无";
+    let roommateRate = 0.5;
 
     if(event){
         eventStats[event]++;
-        eventText = event;
 
-        if(event==="慈悲") reduce = 1;
-        if(event==="巡查") roommateRate = 0.9;
-
-        if(event==="代课翻车" && choice==="proxy" && Math.random()<0.5){
-            proxyFail = true;
-        }
+        if(event === "慈悲") reduce = 1;
+        if(event === "巡查") roommateRate = 0.9;
     }
 
-    if(result==="纸质签到"){
-        if(choice==="skip") damage=2;
-        if(choice==="roommate" && Math.random()<roommateRate) damage=2;
+    if(result === "纸质签到"){
+        if(choice === "skip") damage = 2;
+        if(choice === "roommate" && Math.random() < roommateRate) damage = 2;
     }
 
-    if(result==="定位签到"){
-        if(choice==="skip") damage=2;
-        if(choice==="proxy") damage=3;
-        if(choice==="roommate" && Math.random()<roommateRate) damage=3;
+    if(result === "定位签到"){
+        if(choice === "skip") damage = 2;
+        if(choice === "proxy") damage = 3;
+        if(choice === "roommate" && Math.random() < roommateRate) damage = 3;
     }
 
-    if(proxyFail) damage = 2;
+    if(event === "代课翻车" && choice === "proxy" && Math.random() < 0.5){
+        damage += 2;
+    }
 
     damage = Math.max(0, damage - reduce);
 
     hp -= damage;
-    if(hp<0) hp=0;
-
-    document.getElementById("hp").innerText = hp;
-    document.getElementById("round").innerText = round;
-
-    updateResult(`
-📌 点名：${result}<br>
-⚡ 事件：${eventText}<br>
-👉 选择：${getChoiceName(choice)}<br>
-💔 扣血：${damage}<br>
-❤️ 剩余：${hp}
-`);
-
     round++;
 
-    if(hp<=0) endGame();
+    updateUI();
+
+    updateResult(
+`📌 点名：${result}
+⚡ 事件：${event || "无"}
+👉 选择：${getChoiceName(choice)}
+💔 扣血：${damage}
+❤️ 剩余：${hp}`
+    );
+
+    checkGameOver();
 }
 
-function updateResult(html){
-    document.getElementById("roundResult").innerHTML = html;
+function checkGameOver(){
+    if(hp <= 0){
+        endGame();
+    }
+}
+
+function updateUI(){
+    document.getElementById("hp").innerText = hp;
+    document.getElementById("round").innerText = round;
+}
+
+function updateResult(text){
+    document.getElementById("roundResult").innerText = text;
+}
+
+function enableButtons(on){
+    ["b1","b2","b3","b4"].forEach(id=>{
+        let btn = document.getElementById(id);
+        if(btn) btn.disabled = !on;
+    });
 }
 
 function endGame(){
+    gameOver = true;
+    enableButtons(false);
 
-    let title = "🙂 普通大学生";
+    let total = stats.skip + stats.proxy + stats.roommate || 1;
+    let skipRate = stats.skip / total;
+    let proxyRate = stats.proxy / total;
+    let roommateRate = stats.roommate / total;
 
-    if(stats.skip === round-1) title = "😎 孤胆英雄";
-    if(coinWin >=2) title = "🎲 赌狗之王";
-    if(eventStats["代课翻车"]>=2) title = "🤡 社会性死亡";
+    let title = "";
+    let reason = "";
+    let hidden = false;
 
-    document.getElementById("result").innerHTML =
-        `🎉 游戏结束<br>存活 ${round-1} 轮<br>🏅 ${title}`;
+    // 🔒 隐藏结局
+    if(stats.skip <=1 && stats.proxy <=1 && stats.roommate <=1){
+        title = "🕶️ 虚无主义观察者";
+        reason = "你几乎不参与任何决策，像在旁观规则系统。";
+        hidden = true;
+    }
+    else if(coinCount >= 3 && coinWin >= 2){
+        title = "⚡ 命运操控者";
+        reason = "你在高风险博弈中持续获得收益。";
+        hidden = true;
+    }
+    else if(roommateRate >= 0.7){
+        title = "💀 学术幽灵";
+        reason = "你高度依赖他人完成学业行为。";
+        hidden = true;
+    }
+
+    // 🎯 普通结局
+    if(!hidden){
+        if(coinWin >= 2){
+            title = "🎲 赌命之王";
+            reason = "你多次通过高风险决策获得收益。";
+        }
+        else if(eventStats["代课翻车"] >= 2){
+            title = "🤡 社死选手";
+            reason = "你多次因代课失败暴露风险。";
+        }
+        else if(coinCount >= 2){
+            title = "🪙 赌徒";
+            reason = "你频繁进行概率博弈但不稳定。";
+        }
+        else if(skipRate >= 0.5){
+            title = "😈 逃课大师";
+            reason = "你主要通过逃课规避风险。";
+        }
+        else if(proxyRate + roommateRate > skipRate){
+            title = "🤝 关系户";
+            reason = "你更依赖他人完成任务。";
+        }
+        else {
+            title = "🧠 生存者";
+            reason = "你在多种策略间保持均衡。";
+        }
+    }
+
+    // 🧬 人格分析
+    let personality = "";
+
+    if(skipRate >= 0.6){
+        personality = "🧠 风险逃避型：倾向规避课堂压力";
+    }
+    else if(proxyRate >= 0.4){
+        personality = "🧠 外包依赖型：倾向使用代劳策略";
+    }
+    else if(roommateRate >= 0.4){
+        personality = "🧠 社交依赖型：依赖他人行动";
+    }
+    else if(coinCount >= 2){
+        personality = "🧠 赌性偏好型：偏好概率决策";
+    }
+    else{
+        personality = "🧠 平衡控制型：策略分布均衡";
+    }
+
+    document.getElementById("result").innerText =
+`🎉 游戏结束
+🧾 存活 ${round-1} 轮
+
+🏅 结局：${title}
+💡 解析：${reason}
+
+📊 行为统计：
+- 逃课：${stats.skip}
+- 代课：${stats.proxy}
+- 舍友：${stats.roommate}
+- 赌命：${coinCount}（赢${coinWin}/输${coinLose}）
+
+${personality}`;
 }
+
 </script>
 
 </body>
